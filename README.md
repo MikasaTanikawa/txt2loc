@@ -2,6 +2,10 @@
 
 Tool for converting a single text file created by [TXT2GAM](https://github.com/QSPFoundation/txt2gam) into individual location files and converting them back.
 
+## Requirements
+
+[.NET 7.0 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/7.0)
+
 ## How to use
 
 ```
