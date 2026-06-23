@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "txt2loc": {
+      "commandName": "Project",
+      "commandLineArgs": "-c -p \"my game.qproj\" locations \"my game.txt\""
+    }
+  }
+}
