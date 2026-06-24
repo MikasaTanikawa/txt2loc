@@ -50,8 +50,8 @@ set loc_start="#<<<<<<< START OF LOCATION:"
 set loc_end="#>>>>>>> END OF LOCATION:"
 
 echo Exporting %qsp_file% to %export_dir%...
-call :main > %log_file% 2>&1 || (type %log_file% & pause)
-exit
+call :main > %log_file% 2>&1 || (type %log_file% & pause & exit /b 1)
+exit /b
 
 :main
 if not exist %qsp_file% (echo %qsp_file% not found! & exit /b 1)
@@ -74,4 +74,68 @@ exit /b
 
 ## Example of Windows batch for importing
 
-TODO
+This batch will backup .qsp and .qproj files (compressing them if needed), compose separate location files to single txt file, than convert it to qsp game file.<br>
+Edit paths to .qsp and .qproj files, directory with all imported locations, directory for backups and optionally path to 7z.
+```
+@echo off
+:: EDIT THIS
+set qsp_file=".\game\game.qsp"
+set qsp_proj=".\game\game.qproj"
+set import_dir=".\repo\locations"
+set "backup_dir=.\backups"
+set compress_backup=true
+set compress_backup_call="C:\Program Files\7-Zip\7z.exe" a "%backup_dir%\qsp_backup_datetime.zip" %qsp_file% %qsp_proj%
+
+:: edit if have problems
+set import_file=".\game.txt"
+set log_file=".\import_log.txt"
+set loc_start="#<<<<<<< START OF LOCATION:"
+set loc_end="#>>>>>>> END OF LOCATION:"
+
+echo Importing %import_dir% to %qsp_file%...
+call :main > %log_file% 2>&1 || (type %log_file% & pause & exit /b 1)
+exit /b
+
+:main
+if not exist %import_dir% (echo %import_dir% not found! & exit /b 1)
+@echo on
+:: backup qsp and qproj
+call :backup || exit /b 1
+:: import locations -> txt
+txt2loc -c -s %loc_start% -e %loc_end% -p %qsp_proj% %import_dir% %import_file% || exit /b 1
+:: import txt -> qsp
+txt2gam -c -s %loc_start% -e %loc_end% %import_file% %qsp_file% || exit /b 1
+
+::del %import_file%
+exit /b
+
+:backup
+call :set_datetime
+setlocal EnableDelayedExpansion
+if /i %compress_backup% equ true (
+  :: replacing 'datetime' substring with value of %datetime% variable
+  set "compress_backup_call=!compress_backup_call:datetime=%datetime%!"
+  if exist %qsp_file% if exist %qsp_proj% (!compress_backup_call! || exit /b 1)
+) else (
+  set backup_dir="%backup_dir%\%datetime%"
+  mkdir !backup_dir!
+  if exist %qsp_file% copy %qsp_file% !backup_dir!
+  if exist %qsp_proj% copy %qsp_proj% !backup_dir!
+)
+exit /b
+
+:set_datetime
+echo Current date and time: %date% %time%
+
+set "mydate=%date:\=-%"
+set "mydate=%mydate:/=-%"
+set "mydate=%mydate:.=-%"
+set "mydate=%mydate: =_%"
+
+set "mytime=%time::=%"
+set "mytime=%mytime:.=%"
+set "mytime=%mytime: =%"
+
+set "datetime=%mydate%-%mytime%"
+exit /b
+```

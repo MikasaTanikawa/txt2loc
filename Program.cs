@@ -223,6 +223,12 @@ int Decompose(string input, string output, string? project, string startLoc, str
             // This could fail miserably to find end of location with default T2G_ENDLOC "--" value
             else if (str.StartsWith(endLoc) /*&& str == $"{endLoc} {loc}{T2G_ENDLOCEND}"*/)
             {
+                if (loc == null)
+                {
+                    WriteError($"At {strNum} line: found end of location before start!");
+                    return 1;
+                }
+
                 loc = null;
                 writer?.Close();
                 writer?.Dispose();
