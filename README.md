@@ -62,7 +62,7 @@ txt2gam -d -s %loc_start% -e %loc_end% %qsp_file% %export_file% || exit /b 1
 :: export txt -> locations
 txt2loc -d -s %loc_start% -e %loc_end% -p %qsp_proj% %export_file% %export_dir% || exit /b 1
 :: reimport locations -> txt for binary comparison
-txt2loc -c -s %loc_start% -e %loc_end% -p %qsp_proj% %export_dir% %test_reimport_file% || exit /b 1
+txt2loc -c -s %loc_start% -e %loc_end% %export_dir% %test_reimport_file% || exit /b 1
 :: binary comparison
 fc /b %export_file% %test_reimport_file% >nul && (echo They match) || (echo Comparison failed! & exit /b 1)
 
