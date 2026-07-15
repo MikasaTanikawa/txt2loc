@@ -249,7 +249,7 @@ int Decompose(string input, string output, string? project, string startLoc, str
     if (projectLocs.Count == 0)
         return CreateLocationsFile(locationsFile);
     else
-        return UpdateLocationsFile(locationsFile);
+        return UpdateLocationsFile(locationsFile, false);
 }
 
 int Compose(string input, string output, string? project, string startLoc, string endLoc)
@@ -262,7 +262,7 @@ int Compose(string input, string output, string? project, string startLoc, strin
 
     var locationsFile = Path.Combine(input, LOCS_FILE);
 
-    int updateResult = UpdateLocationsFile(locationsFile);
+    int updateResult = UpdateLocationsFile(locationsFile, true);
     if (updateResult != 0)
         return updateResult;
 
@@ -389,7 +389,7 @@ int CreateLocationsFile(string locationsFile)
     return 0;
 }
 
-int UpdateLocationsFile(string locationsFile)
+int UpdateLocationsFile(string locationsFile, bool composing)
 {
     var projectLocs = ReadLocationsFile(locationsFile);
 
@@ -404,9 +404,18 @@ int UpdateLocationsFile(string locationsFile)
         return 1;
     }
 
+    var outputDir = new DirectoryInfo(dir);
+
+    if (!Directory.Exists(dir))
+    {
+        WriteError($"Can't find or open '{dir}' directory for current directory '{Directory.GetCurrentDirectory()}'.");
+        return 1;
+    }
+
     using var ms = new MemoryStream();
     using var writer = XmlWriter.Create(ms, GetXmlWriterSettings());
     var doc = new XmlDocument();
+    bool docChanged = false;
     doc.Load(locationsFile);
 
     // Remove deleted or moved locations from xml file
@@ -417,18 +426,32 @@ int UpdateLocationsFile(string locationsFile)
             var node = doc.SelectSingleNode($"//Location[@name='{loc.Key}']");
 
             node?.ParentNode?.RemoveChild(node);
+            docChanged = true;
         }
     }
 
-    // Remove deleted folders from xml file
+    // Remove deleted folders from xml file (or create empty directories if not composing)
     var folders = doc.SelectNodes("//Folder");
     if (folders != null)
     {
         foreach (XmlNode folder in folders)
         {
             string? folderName = folder.Attributes?["name"]?.Value;
-            if (folderName == null || !folder.HasChildNodes && !Directory.Exists(Path.Combine(dir, folderName)))
+            if (folderName == null)
+            {
                 folder.ParentNode?.RemoveChild(folder);
+                docChanged = true;
+            }
+            else if (!folder.HasChildNodes && !Directory.Exists(Path.Combine(dir, folderName)))
+            {
+                if (composing)
+                {
+                    folder.ParentNode?.RemoveChild(folder);
+                    docChanged = true;
+                }
+                else
+                    outputDir.CreateSubdirectory(folderName);
+            }
         }
     }
 
@@ -439,18 +462,36 @@ int UpdateLocationsFile(string locationsFile)
         var node = doc.SelectSingleNode($"//Location[@name='{loc}']");
 
         if (node == null)
+        {
             XmlAddLocation(doc, dir, file);
+            docChanged = true;
+        }
     }
 
-    // Add new empty folders into xml file
+    // Add new empty folders into xml file (and create .gitignore file in empty directories if needed)
     foreach (var folder in Directory.GetDirectories(dir))
     {
-        if (!Directory.EnumerateFiles(folder).Any())
+        var folderFiles = Directory.EnumerateFiles(folder);
+        bool emptyFolder = false;
+
+        if (!folderFiles.Any())
+        {
+            File.Create(Path.Combine(folder, ".gitignore"));
+            emptyFolder = true;
+        }
+        else if (folderFiles.Count() == 1 && Path.GetFileName(folderFiles.Single()) == ".gitignore")
+            emptyFolder = true;
+
+        if (emptyFolder)
+        {
             XmlAddFolder(doc, doc.SelectSingleNode("//Structure"), new DirectoryInfo(folder).Name);
+            docChanged = true;
+        }
     }
 
     doc.Save(writer);
-    WriteMemoryStreamToXml(locationsFile, ms, GetXmlWriterSettings());
+    if (docChanged)
+        WriteMemoryStreamToXml(locationsFile, ms, GetXmlWriterSettings());
 
     return 0;
 }
